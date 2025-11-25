@@ -1,0 +1,9 @@
+{
+  "version": "0.0.0",
+  "dependencies": {
+    "@ethersproject/providers": "^5.8.0",
+    "@snapshot-labs/snapshot.js": "^0.14.17",
+    "dotenv": "^17.2.3",
+    "ethers": "^6.15.0"
+  }
+}
