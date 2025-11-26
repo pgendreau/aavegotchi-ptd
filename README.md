@@ -3,7 +3,7 @@
 **P**artial **T**reasury **D**istribution participation calculator
 
 ## Description
-These scripts can be used to calculate the PTD distribution amounts for eligible wallets. The TotalDistributionAmounts.csv assumes a total distribution amount of 1200. The values can still change based on wallets becoming eligible by voting on the PTD AGIP, as well as by wallet-linking, which would be handled via support tickets.
+These scripts can be used to calculate the PTD distribution amounts for eligible wallets. The TotalDistributionAmounts.csv assumes a total distribution amount of 1200. The values can still change based on wallets becoming eligible by voting on the PTD AGIP, as well as by wallet-linking, which would be handled via typeform.
 
 ## Execution
 To get the PTD distribution amounts for all eligible wallets, run the following scripts in order:
