@@ -3,27 +3,22 @@
 **P**artial **T**reasury **D**istribution participation calculator
 
 ## Description
-This script can be used to get the total number used to calculate the distribution for a given address.
+These scripts can be used to calculate the PTD distribution amounts for eligible wallets. The TotalDistributionAmounts.csv assumes a total distribution amount of 1200. The values can still change based on wallets becoming eligible by voting on the PTD AGIP, as well as by wallet-linking, which would be handled via support tickets.
 
-## Prerequisites
-1. Create a file named .env from .env.example containing the RPC provider url for each network.
-   
-   **Note**: The node need to be an archive node as we are querying blocks in the past.
+## Execution
+To get the PTD distribution amounts for all eligible wallets, run the following scripts in order:
 
-2. install dependencies with `npm install`
+1. **VotingData/CalculateCachedVoteCounts.py**  
+   This will fetch data from Snapshot for concluded proposals to create a cache.
 
-3. Clone snapshot's [score-api](https://github.com/snapshot-labs/score-api) git repository
+2. **VotingData/CalculateVotingWeights.py**  
+   This will fetch new data (e.g. proposals that are still active) and use the new data in combination with the generated cache to determine all eligible wallets as well as their voting percentages.
 
-4. Cd into the score-api directory run `git reset --hard 356383eabcf17528f94bcef194a5f77179161f35`
+3. **CombinedVP/getTotalVp.js**  
+   This will get a wallet's combined VP. Run it for every wallet in VotingData/EligibleWalletsLatest.csv to generate CombinedVP.csv.
 
-5. Run `npm install`
+4. **RF/CalculateRFRewards.py**  
+   This will calculate the distribution amounts for the RF-based pool for all eligible wallets.
 
-6. Run a local copy of the score api using the docker-compose file in the root of the repository.
-   `docker-compose up`
-
-## Usage
-`node getTotalVp.js <address>`
-
-Example:
-
-`node getTotalVp.js 0x6b175474e89094c44da98b954eedeac495271d0f`
+5. **GetTotalDistributionAmounts.py**  
+   This will calculate the current distribution amounts for all eligible wallets.

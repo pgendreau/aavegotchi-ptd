@@ -8,13 +8,13 @@ STEP 1 (CalculateCachedVoteCounts):
   - Computes vote counts for concluded proposals only (that data no longer changes).
   - Outputs:
       1) VoteCounts.csv                 -> vote counts for ALL wallets (eligible or not)
-      2) EligibleWallets.csv            -> wallets that are eligible based on AGIP6M rule (per-wallet eligibility)
+      2) EligibleWalletsCached.csv            -> wallets that are eligible based on AGIP6M rule (per-wallet eligibility)
       3) ConcludedDecisionCount.txt     -> (# of concluded "countable decisions" used when producing VoteCounts.csv)
 
 STEP 2 (this script):
   - Inputs:
       - VoteCounts.csv              (ALL wallets, counts from concluded proposals)
-      - EligibleWallets.csv         (eligible wallets after concluded proposals)
+      - EligibleWalletsCached.csv         (eligible wallets after concluded proposals)
       - ActiveProposals.csv         (proposals that should amend counts; may include signal proposals)
       - AGIPActive.csv             (subset of ActiveProposals; ONLY proposals that can make a wallet eligible)
       - WalletAliases.csv           (master + slave wallets)
@@ -33,6 +33,7 @@ STEP 2 (this script):
 
   - Output:
       - OutputWeights.csv (only eligible wallets, after applying AGIPActive updates)
+      - EligibleWalletsLatest.csv (all eligible wallets, after applying AGIPActive updates)
 
 Important notes / assumptions
 =============================
@@ -49,7 +50,7 @@ VoteCounts.csv:
   - includes ALL wallets/identities seen in concluded proposals
   - num_proposals is int
 
-EligibleWallets.csv:
+EligibleWalletsCached.csv:
     wallet
   - one wallet address per row (header optional, tolerated)
   - wallets eligible after concluded proposals
@@ -74,11 +75,15 @@ OutputWeights.csv:
   - ONLY eligible wallets (after updating with AGIPActive votes)
   - Eligible slave wallets are included but forced to 0,0.0 (no double-dipping)
 
+EligibleWalletsLatest.csv:
+    wallet
+  - ONLY eligible wallets (after updating with AGIPActive votes)
+
 Usage
 =====
     python CalculateVotingWeights.py \
-        VoteCounts.csv EligibleWallets.csv ConcludedDecisionCount.txt ActiveProposals.csv \
-        AGIPActive.csv WalletAliases.csv OutputWeights.csv
+        VoteCounts.csv EligibleWalletsCached.csv ConcludedDecisionCount.txt ActiveProposals.csv \
+        AGIPActive.csv WalletAliases.csv OutputWeights.csv EligibleWalletsLatest.csv
 """
 
 import csv
@@ -416,16 +421,30 @@ def write_output_weights(
             writer.writerow([wallet, n, f"{w:.6f}"])
 
 
+def write_eligible_wallets_latest(path: str, eligible_wallets: Set[str]) -> None:
+    """
+    Write EligibleWalletsLatest.csv containing the UPDATED eligible set (no weights).
+
+    Output schema:
+        wallet
+    """
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["wallet"])
+        for w in sorted(eligible_wallets):
+            writer.writerow([w])
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
-    if len(sys.argv) != 8:
+    if len(sys.argv) != 9:
         print(
             "Usage:\n"
-            "  python CalculateVotingWeights.py VoteCounts.csv EligibleWallets.csv ActiveProposals.csv AGIPActive.csv "
-            "WalletAliases.csv ConcludedDecisionCount.txt OutputWeights.csv",
+            "  python CalculateVotingWeights.py VoteCounts.csv EligibleWalletsCached.csv ConcludedDecisionCount.txt "
+            "ActiveProposals.csv AGIPActive.csv WalletAliases.csv OutputWeights.csv EligibleWalletsLatest.csv",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -437,6 +456,7 @@ def main():
     AGIPActive_path = sys.argv[5]
     aliases_path = sys.argv[6]
     output_path = sys.argv[7]
+    eligible_latest_path = sys.argv[8]
 
     # Load inputs
     counts_all = load_vote_counts(vote_counts_path)
@@ -488,6 +508,9 @@ def main():
 
     print(f"Newly eligible wallets from AGIPActive: {len(newly_eligible_from_agip)}", file=sys.stderr)
     print(f"Eligible wallets (post-active): {len(eligible_wallets_updated)}", file=sys.stderr)
+
+    write_eligible_wallets_latest(eligible_latest_path, eligible_wallets_updated)
+    print(f"Wrote: {eligible_latest_path}", file=sys.stderr)
 
     # Write final OutputWeights.csv for eligible wallets only.
     write_output_weights(

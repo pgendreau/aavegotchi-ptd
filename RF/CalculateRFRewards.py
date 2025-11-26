@@ -35,7 +35,7 @@ Within each leaderboard:
 
 Eligibility
 ===========
-Eligible wallets are taken from OutputWeights.csv (from the previous pipeline step).
+Eligible wallets are taken from EligibleWalletsLatest.csv (from the previous pipeline step).
 Schema:
     wallet,num_proposals,weight
 We only use the 'wallet' column. These are the addresses that may receive rewards.
@@ -73,7 +73,7 @@ Output
 Writes a CSV file containing all eligible wallets and their combined reward amount.
 
 Output schema:
-    wallet,reward
+    wallet,rewardRF
 
 Notes:
 - Eligible wallets that have no entries in any leaderboard will receive reward = 0.
@@ -82,7 +82,7 @@ Notes:
 Usage
 =====
     python CalculateRFRewards.py \
-        OutputWeights.csv \
+        EligibleWalletsLatest.csv \
         BRSRanking.csv KINRankings.csv XPRankings.csv \
         RewardAmount \
         RewardPercentages \
@@ -97,7 +97,7 @@ Where:
 
 Example:
   python CalculateRFRewards.py \
-      VotingData/OutputWeights.csv \
+      VotingData/EligibleWalletsLatest.csv \
       RF/leaderboard_withSetsRarityScore_block_37694538.csv \
       RF/leaderboard_kinship_block_37694538.csv \
       RF/leaderboard_experience_block_37694538.csv \
@@ -162,9 +162,9 @@ def parse_percentages(s: str) -> Tuple[float, float, float]:
     return vals[0], vals[1], vals[2]
 
 
-def load_eligible_wallets_from_outputweights(path: str) -> Set[str]:
+def load_eligible_wallets(path: str) -> Set[str]:
     """
-    Load eligible wallets from OutputWeights.csv (schema: wallet,num_proposals,weight).
+    Load eligible wallets from EligibleWalletsLatest.csv (schema: wallet,num_proposals,weight).
     We only use the 'wallet' column.
 
     Returns:
@@ -266,7 +266,7 @@ def write_rewards_output(
 ) -> None:
     """
     Write output CSV:
-      wallet,reward
+      wallet,rewardRF
 
     Includes ALL eligible wallets, even if reward=0.
     Sorted by reward desc then wallet asc for determinism.
@@ -279,7 +279,7 @@ def write_rewards_output(
 
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["wallet", "reward"])
+        writer.writerow(["wallet", "rewardRF"])
         for w, r in rows:
             writer.writerow([w, f"{r:.10f}"])
 
@@ -293,13 +293,13 @@ def main():
         print(
             "Usage:\n"
             "  python CalculateRFRewards.py "
-            "OutputWeights.csv BRSRanking.csv KINRankings.csv XPRankings.csv RewardAmount RewardPercentages OutputRewards.csv\n\n"
+            "EligibleWalletsLatest.csv BRSRanking.csv KINRankings.csv XPRankings.csv RewardAmount RewardPercentages OutputRewards.csv\n\n"
             "RewardPercentages examples: \"50,30,20\" or \"0.5,0.3,0.2\"",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    outputweights_path = sys.argv[1]
+    eligible_wallets_path = sys.argv[1]
     brs_path = sys.argv[2]
     kin_path = sys.argv[3]
     xp_path = sys.argv[4]
@@ -307,9 +307,9 @@ def main():
     reward_percentages_raw = sys.argv[6]
     output_path = sys.argv[7]
 
-    eligible_wallets = load_eligible_wallets_from_outputweights(outputweights_path)
+    eligible_wallets = load_eligible_wallets(eligible_wallets_path)
     if not eligible_wallets:
-        print("No eligible wallets found in OutputWeights.csv; output will be empty rewards.", file=sys.stderr)
+        print("No eligible wallets found in EligibleWalletsLatest.csv; output will be empty rewards.", file=sys.stderr)
 
     try:
         reward_amount = float(reward_amount_raw)

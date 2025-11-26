@@ -1,5 +1,6 @@
-.env
-node_modules
-score-api
-tmp
-
+CombinedVP/.env
+CombinedVP/node_modules
+CombinedVP/score-api
+CombinedVP/tmp
+.idea
+VotingData/.vs

@@ -80,7 +80,7 @@ Outputs
        - a slave wallet address included explicitly with num_proposals = 0
    All wallets are normalized to lowercase.
 
-2) EligibleWallets.csv
+2) EligibleWalletsCached.csv
    - Wallets that are eligible based on AGIP6M rule (per-wallet eligibility).
    - IMPORTANT: eligibility is per-wallet (raw address), WITHOUT aliasing:
        * a slave wallet voting makes the slave eligible, not the master
@@ -124,7 +124,7 @@ Behavior summary
 
 - **Writing outputs**
     5. Write VoteCounts.csv for all identities (plus explicit 0-rows for all slaves).
-    6. Write EligibleWallets.csv (eligible wallets only).
+    6. Write EligibleWalletsCached.csv (eligible wallets only).
     7. Write ConcludedDecisionCount.txt (number of IncludedProposals rows).
 
 Rate limiting
@@ -135,7 +135,7 @@ Usage
 =====
     python CalculateCachedVoteCounts.py \
         IncludedProposals.csv AGIP6M.csv GV2AV.csv WalletAliases.csv \
-        VoteCounts.csv EligibleWallets.csv ConcludedDecisionCount.txt
+        VoteCounts.csv EligibleWalletsCached.csv ConcludedDecisionCount.txt
 """
 
 import csv
@@ -616,7 +616,7 @@ def write_vote_counts_csv(path: str, wallet_counts: Dict[str, int], slaves: Set[
 
 
 def write_eligible_wallets_csv(path: str, eligible_wallets: Set[str]) -> None:
-    """Write EligibleWallets.csv: single column wallet."""
+    """Write EligibleWalletsCached.csv: single column wallet."""
     rows = sorted(eligible_wallets)
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -640,7 +640,7 @@ def main():
         print(
             "Usage:\n"
             "  python CalculateCachedVoteCounts.py IncludedProposals.csv AGIP6M.csv GV2AV.csv WalletAliases.csv "
-            "VoteCounts.csv EligibleWallets.csv ConcludedDecisionCount.txt",
+            "VoteCounts.csv EligibleWalletsCached.csv ConcludedDecisionCount.txt",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -663,7 +663,7 @@ def main():
 
     agip_proposals = load_proposals_from_csv(agip_path)
     if not agip_proposals:
-        print("No proposals in AGIP6M.csv; EligibleWallets.csv will be empty.", file=sys.stderr)
+        print("No proposals in AGIP6M.csv; EligibleWalletsCached.csv will be empty.", file=sys.stderr)
 
     av_to_gvs = load_av_to_gvs(gv2av_path)
     decision_groups = build_decision_groups(included_proposals, av_to_gvs)

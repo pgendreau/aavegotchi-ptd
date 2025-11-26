@@ -16,7 +16,7 @@ To avoid overloading the Snapshot API with tons of requests, calculations were s
 ## Prerequisites for calculating the current weights
 1. Output from the caching step:  
    1.1 VoteCounts.csv (all wallets that voted on any proposals in IncludedProposals.csv and how many proposals they voted on)  
-   1.2 EligibleWallets.csv (a list of eligible wallets based on the cached data)  
+   1.2 EligibleWalletsCached.csv (a list of eligible wallets based on the cached data)  
    1.3 ConcludedDecisionCount.txt (number of proposals processed in the caching step)  
 2. ActiveProposals.csv (new proposals - e.g., active ones - not included in the caching step)  
 3. AGIPActive.csv (new AGIPs not included in the caching step; a subset of ActiveProposals)  
@@ -24,12 +24,12 @@ To avoid overloading the Snapshot API with tons of requests, calculations were s
 
 ## Usage (cache):
 
-Either use VoteCounts.csv, EligibleWallets.csv, and ConcludedDecisionCount.txt from this repository, or calculate them yourself using:
+Either use VoteCounts.csv, EligibleWalletsCached.csv, and ConcludedDecisionCount.txt from this repository, or calculate them yourself using:
 
-python CalculateCachedVoteCounts.py IncludedProposals.csv AGIP6M.csv GV2AV.csv WalletAliases.csv VoteCounts.csv EligibleWallets.csv ConcludedDecisionCount.txt
+python CalculateCachedVoteCounts.py IncludedProposals.csv AGIP6M.csv GV2AV.csv WalletAliases.csv VoteCounts.csv EligibleWalletsCached.csv ConcludedDecisionCount.txt
 
 ## Usage (weights):
 
 Use the command:
 
-python CalculateVotingWeights.py VoteCounts.csv EligibleWallets.csv ConcludedDecisionCount.txt ActiveProposals.csv AGIPActive.csv WalletAliases.csv OutputWeights.txt
+python CalculateVotingWeights.py VoteCounts.csv EligibleWalletsCached.csv ConcludedDecisionCount.txt ActiveProposals.csv AGIPActive.csv WalletAliases.csv OutputWeights.txt
