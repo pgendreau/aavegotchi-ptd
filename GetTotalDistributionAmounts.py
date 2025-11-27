@@ -104,7 +104,7 @@ Usage
         TotalDistributionAmounts.csv
 
 Example:
-    python GetTotalDistributionAmounts.py CombinedVP.csv OutputWeights.csv OutputRFRewards.csv 25000 25000 TotalDistributionAmounts.csv
+    python GetTotalDistributionAmounts.py CombinedVP.csv OutputWeights.csv OutputRFRewards.csv 400 400 TotalDistributionAmounts.csv
 """
 
 import csv
