@@ -32,4 +32,4 @@ python CalculateCachedVoteCounts.py IncludedProposals.csv AGIP6M.csv GV2AV.csv W
 
 Use the command:
 
-python CalculateVotingWeights.py VoteCounts.csv EligibleWalletsCached.csv ConcludedDecisionCount.txt ActiveProposals.csv AGIPActive.csv WalletAliases.csv OutputWeights.txt
+python CalculateVotingWeights.py VoteCounts.csv EligibleWalletsCached.csv ConcludedDecisionCount.txt ActiveProposals.csv AGIPActive.csv WalletAliases.csv OutputWeights.csv EligibleWalletsLatest.csv
