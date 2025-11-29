@@ -18,14 +18,14 @@ Using the snapshot from Round 1 of RF S12 (as voted for in poll PTD-F), Calculat
       leaderboard_withSetsRarityScore_block_37694538.csv \ \
       leaderboard_kinship_block_37694538.csv \ \
       leaderboard_experience_block_37694538.csv \ \
-      320 \ \
+      296.26 \ \
       "0.625,0.25,0.125" \ \
       OutputRFRewards.csv
 
-Assuming a total distribution of 1200, 400 would be distributed via the RF pool.  
-The script does not consider Battler rewards, so distributing 400 via:  
+Assuming a total distribution of 1111, 370.333 would be distributed via the RF pool.  
+The script does not consider Battler rewards, so distributing 370.333 via:  
 20% Battler,  
 50% BRS,  
 20% Kinship,
 10% XP,  
-would be equivalent to distributing 320 via 62.5% BRS, 25% KIN, 12.5% XP.
+would be equivalent to distributing 296.26 via 62.5% BRS, 25% KIN, 12.5% XP.

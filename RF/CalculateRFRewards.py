@@ -101,7 +101,7 @@ Example:
       RF/leaderboard_withSetsRarityScore_block_37694538.csv \
       RF/leaderboard_kinship_block_37694538.csv \
       RF/leaderboard_experience_block_37694538.csv \
-      320 \
+      296.26 \
       "0.625,0.25,0.125" \
       RF/OutputRFRewards.csv
 
