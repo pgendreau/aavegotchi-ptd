@@ -10,7 +10,7 @@ const snapshotConfig = {
   8453: {
     blockNumber: 37782588,
     url: "https://score.snapshot.org",
-    subgraphUrl: "https://subgraph.satsuma-prod.com/tWYl5n5y04oz/aavegotchi/aavegotchi-core-base/api",
+    subgraphUrl: "https://api.goldsky.com/api/public/project_cmh3flagm0001r4p25foufjtt/subgraphs/aavegotchi-core-base/prod/gn",
     providerURL: process.env.BASE_PROVIDER_URL,
     ghstAddress: "0xcD2F22236DD9Dfe2356D7C543161D4d260FD9BcB",
     strategies: [
@@ -66,7 +66,7 @@ const snapshotConfig = {
   137: {
     blockNumber: 78624868,
     url: "http://localhost:3003",
-    subgraphUrl: "https://subgraph.satsuma-prod.com/tWYl5n5y04oz/aavegotchi/aavegotchi-core-matic/api",
+    subgraphUrl: "https://api.goldsky.com/api/public/project_cmh3flagm0001r4p25foufjtt/subgraphs/aavegotchi-core-matic/prod/gn",
     providerURL: process.env.POLYGON_PROVIDER_URL,
     ghstAddress: "0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7",
     strategies: [
