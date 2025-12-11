@@ -1,0 +1,11 @@
+{
+  "name": "contract",
+  "version": "1.0.0",
+  "type": "module",
+  "devDependencies": {
+    "@openzeppelin/contracts": "^5.4.0",
+    "@types/node": "^22.19.1",
+    "hardhat": "^3.0.17",
+    "typescript": "~5.8.0"
+  }
+}
