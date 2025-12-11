@@ -41,7 +41,8 @@ contract MerkleEthDistributor is ReentrancyGuard {
     }
 
     receive() external payable {}
-function claim(
+
+    function claim(
         uint256 index,
         address account,
         uint256 amountWei,
