@@ -85,30 +85,62 @@ def build_layers(leaves: List[bytes]) -> List[List[bytes]]:
         cur = layers[-1]
         nxt: List[bytes] = []
         i = 0
+        # while i < len(cur):
+        #     left = cur[i]
+        #     right = cur[i + 1] if (i + 1) < len(cur) else cur[i]  # duplicate last if odd
+        #     nxt.append(hash_pair(left, right))
+        #     i += 2
         while i < len(cur):
             left = cur[i]
-            right = cur[i + 1] if (i + 1) < len(cur) else cur[i]  # duplicate last if odd
-            nxt.append(hash_pair(left, right))
-            i += 2
+            if (i + 1) < len(cur):
+                right = cur[i + 1]
+                nxt.append(hash_pair(left, right))
+                i += 2
+            else:
+                # promote odd node (carry up unchanged)
+                nxt.append(left)
+                i += 1
         layers.append(nxt)
     return layers
 
 
+# def get_proof(layers: List[List[bytes]], leaf_index: int) -> List[str]:
+#     """
+#     Proof is list of sibling hashes (bytes32) from leaf level up to (but excluding) root.
+#     """
+#     proof: List[str] = []
+#     idx = leaf_index
+#
+#     for level in range(len(layers) - 1):
+#         layer = layers[level]
+#         sibling_idx = idx ^ 1
+#         if sibling_idx < len(layer):
+#             sibling = layer[sibling_idx]
+#         else:
+#             sibling = layer[idx]  # duplicated last node case
+#         proof.append("0x" + sibling.hex())
+#         idx //= 2
+#
+#     return proof
 def get_proof(layers: List[List[bytes]], leaf_index: int) -> List[str]:
     """
-    Proof is list of sibling hashes (bytes32) from leaf level up to (but excluding) root.
+    Proof compatible with "promote odd nodes" construction:
+    If a node is the last element of an odd-length level, it is promoted and has no sibling,
+    so we do NOT append anything to the proof at that level.
     """
     proof: List[str] = []
     idx = leaf_index
 
     for level in range(len(layers) - 1):
         layer = layers[level]
+
+        # If this node was promoted (odd count and it's the last one), there's no sibling to add.
+        if (len(layer) % 2 == 1) and (idx == len(layer) - 1):
+            idx //= 2
+            continue
+
         sibling_idx = idx ^ 1
-        if sibling_idx < len(layer):
-            sibling = layer[sibling_idx]
-        else:
-            sibling = layer[idx]  # duplicated last node case
-        proof.append("0x" + sibling.hex())
+        proof.append("0x" + layer[sibling_idx].hex())
         idx //= 2
 
     return proof
