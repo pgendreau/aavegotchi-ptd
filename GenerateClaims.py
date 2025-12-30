@@ -12,6 +12,7 @@ getcontext().prec = 80  # high precision for Decimal math
 
 WEI_PER_ETH = Decimal("1000000000000000000")
 
+
 def parse_amount_to_wei(value: str, unit: str) -> int:
     """
     Convert rewardTotal to integer wei.
@@ -59,8 +60,8 @@ def hash_leaf(index: int, account: str, amount_wei: int) -> bytes:
     - This is a "double keccak": keccak( keccak(abi.encode(account, amount)) ).
     """
     inner_encoded = encode(["address", "uint256"], [account, amount_wei])
-    inner_hash = keccak(inner_encoded)      # keccak256(abi.encode(account, amount))
-    return keccak(inner_hash)               # keccak256(bytes.concat(inner_hash))
+    inner_hash = keccak(inner_encoded)  # keccak256(abi.encode(account, amount))
+    return keccak(inner_hash)           # keccak256(bytes.concat(inner_hash))
 
 
 def hash_pair(a: bytes, b: bytes) -> bytes:
@@ -126,6 +127,8 @@ def usage() -> str:
         "Script uses:\n"
         "  address column = 'wallet'\n"
         "  amount column  = 'rewardTotal'\n"
+        "Note:\n"
+        "  Rows with rewardTotal == 0 wei are skipped.\n"
     )
 
 
@@ -170,28 +173,39 @@ def main() -> None:
         raise SystemExit(f"Missing required column {amount_col!r} in CSV header.")
 
     # Normalize + prepare values
+    # IMPORTANT CHANGE: skip rows with amount_wei == 0
     values: List[Tuple[int, str, int, Dict[str, Any]]] = []
-    for i, r in enumerate(rows):
+    skipped_zero = 0
+
+    for row_idx, r in enumerate(rows):
         addr_raw = (r.get(address_col) or "").strip()
         if not addr_raw:
-            raise SystemExit(f"Row {i+1}: empty wallet address.")
+            raise SystemExit(f"Row {row_idx+1}: empty wallet address.")
 
         try:
             account = to_checksum_address(addr_raw)
         except Exception as e:
-            raise SystemExit(f"Row {i+1}: invalid address {addr_raw!r}: {e}")
+            raise SystemExit(f"Row {row_idx+1}: invalid address {addr_raw!r}: {e}")
 
         amt_raw = (r.get(amount_col) or "").strip()
         if not amt_raw:
-            raise SystemExit(f"Row {i+1}: empty rewardTotal.")
+            raise SystemExit(f"Row {row_idx+1}: empty rewardTotal.")
 
         try:
             amount_wei = parse_amount_to_wei(amt_raw, unit)
         except Exception as e:
-            raise SystemExit(f"Row {i+1}: bad rewardTotal {amt_raw!r}: {e}")
+            raise SystemExit(f"Row {row_idx+1}: bad rewardTotal {amt_raw!r}: {e}")
+
+        if amount_wei == 0:
+            skipped_zero += 1
+            continue
 
         meta = dict(r)  # keep original row for auditing/UI (optional)
-        values.append((i, account, amount_wei, meta))
+        values.append((len(values), account, amount_wei, meta))
+        # Note: index is now contiguous among included claims (0..n-1)
+
+    if not values:
+        raise SystemExit("All rows were skipped (no wallets with non-zero rewardTotal).")
 
     # Build leaves and merkle tree
     leaves = [hash_leaf(i, account, amount_wei) for (i, account, amount_wei, _meta) in values]
@@ -220,13 +234,20 @@ def main() -> None:
         "leafHash": "keccak256(bytes.concat(keccak256(abi.encode(account, amountWei))))",
         "nodeHash": "keccak256(min(a,b) || max(a,b))  // sorted-pair hash",
         "claims": claims,
+        "stats": {
+            "includedWallets": len(values),
+            "skippedZeroAmountWallets": skipped_zero,
+            "inputRows": len(rows),
+        },
     }
 
     with open(output_json, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
 
     print("merkleRoot:", root_hex)
-    print("wallets:", len(values))
+    print("input rows:", len(rows))
+    print("included wallets:", len(values))
+    print("skipped zero-amount wallets:", skipped_zero)
     print("wrote:", output_json)
 
 
