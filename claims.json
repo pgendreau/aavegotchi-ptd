@@ -11809,6 +11809,8 @@
   "stats": {
     "includedWallets": 473,
     "skippedZeroAmountWallets": 11,
-    "inputRows": 484
+    "inputRows": 484,
+    "totalAmountWei": "1036920000000700000000",
+    "totalAmountEth": "1036.9200000007"
   }
 }

@@ -208,6 +208,7 @@ def main() -> None:
     # IMPORTANT CHANGE: skip rows with amount_wei == 0
     values: List[Tuple[int, str, int, Dict[str, Any]]] = []
     skipped_zero = 0
+    total_amount_wei = 0
 
     for row_idx, r in enumerate(rows):
         addr_raw = (r.get(address_col) or "").strip()
@@ -235,6 +236,7 @@ def main() -> None:
         meta = dict(r)  # keep original row for auditing/UI (optional)
         values.append((len(values), account, amount_wei, meta))
         # Note: index is now contiguous among included claims (0..n-1)
+        total_amount_wei += amount_wei
 
     if not values:
         raise SystemExit("All rows were skipped (no wallets with non-zero rewardTotal).")
@@ -270,6 +272,8 @@ def main() -> None:
             "includedWallets": len(values),
             "skippedZeroAmountWallets": skipped_zero,
             "inputRows": len(rows),
+            "totalAmountWei": str(total_amount_wei),
+            **({"totalAmountEth": str(Decimal(total_amount_wei) / WEI_PER_ETH)} if unit == "eth" else {}),
         },
     }
 
