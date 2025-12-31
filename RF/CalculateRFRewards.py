@@ -68,6 +68,29 @@ Processing steps (per leaderboard)
 7) Convert entry weights to entry rewards by multiplying with that leaderboard's pool.
 8) Aggregate entry rewards by originalOwner (wallet).
 
+Additional per-entry outputs
+============================
+In addition to the per-wallet reward summary (OutputRewards.csv), this script now also writes
+three *per-entry* CSV files, one per leaderboard:
+
+  - BRSRewards.csv
+  - KINRewards.csv
+  - XPRewards.csv
+
+Each of these files has the following schema:
+    position,gotchiID,name,withSetsRarityScore,kinship,experience,level,originalOwner,
+    originalWeight,weightAmongEligible,reward
+
+Where:
+  - position,gotchiID,name,withSetsRarityScore,kinship,experience,level,originalOwner
+        are copied from the corresponding leaderboard CSV row (originalOwner is normalized).
+  - originalWeight       = (1.0 / position) ** exponent_for_that_leaderboard
+  - weightAmongEligible  = originalWeight / sum_of_originalWeights_over_all_eligible_entries
+  - reward               = leaderboard_pool * weightAmongEligible
+
+Only entries whose originalOwner is in the eligible wallet set are written to these
+per-entry CSV files.
+
 Output
 ======
 Writes a CSV file containing all eligible wallets and their combined reward amount.
@@ -77,7 +100,8 @@ Output schema:
 
 Notes:
 - Eligible wallets that have no entries in any leaderboard will receive reward = 0.
-- You can optionally also add diagnostic prints for totals and missing data.
+- BRSRewards.csv, KINRewards.csv, XPRewards.csv are written into the current working
+  directory (one line per eligible gotchi entry, for the respective leaderboard).
 
 Usage
 =====
@@ -215,48 +239,149 @@ def iter_rank_entries(path: str) -> Iterable[Tuple[int, str]]:
             yield pos, owner
 
 
+# ---------------------------------------------------------------------------
+# Core leaderboard computation
+# ---------------------------------------------------------------------------
+
 def compute_owner_rewards_from_ranking(
     ranking_path: str,
     eligible_wallets: Set[str],
     pool_amount: float,
     exponent: float,
-) -> Dict[str, float]:
+) -> Tuple[Dict[str, float], List[Dict[str, str]]]:
     """
-    Compute per-owner reward allocation for one ranking list.
+    Compute per-owner reward allocation for one ranking list AND per-entry details.
 
     Steps:
-      - Filter rows to eligible owners.
-      - Compute entry weights: (1/position)^exponent
-      - Normalize entry weights to sum to 1.0
-      - Multiply by pool_amount to get entry rewards
-      - Sum entry rewards by owner
+      - Load ranking CSV and filter rows to eligible owners.
+      - Compute entry weights: (1/position)^exponent.
+      - Sum all entry weights (over eligible entries).
+      - Normalize entry weights to sum to 1.0 (weightAmongEligible).
+      - Multiply by pool_amount to get entry rewards.
+      - Sum entry rewards by owner (per-owner rewards).
 
     Returns:
-      dict owner -> reward_from_this_ranking
+      (
+        owner_rewards,     # dict owner -> reward_from_this_ranking
+        entry_details      # list of dicts for writing per-entry CSV:
+                           #   {
+                           #       "position",
+                           #       "gotchiID",
+                           #       "name",
+                           #       "withSetsRarityScore",
+                           #       "kinship",
+                           #       "experience",
+                           #       "level",
+                           #       "originalOwner",
+                           #       "originalWeight",
+                           #       "weightAmongEligible",
+                           #       "reward"
+                           #   }
+      )
     """
-    # Collect (owner, w_i) for eligible entries
-    entries: List[Tuple[str, float]] = []
-    for pos, owner in iter_rank_entries(ranking_path):
-        if owner not in eligible_wallets:
-            continue
+    # We need more columns than in iter_rank_entries, so read full rows here.
+    entry_rows: List[Dict[str, str]] = []
+    with open(ranking_path, "r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        cols = set(reader.fieldnames or [])
+        required_cols = {
+            "position",
+            "gotchiID",
+            "name",
+            "withSetsRarityScore",
+            "kinship",
+            "experience",
+            "level",
+            "originalOwner",
+        }
+        missing = required_cols - cols
+        if missing:
+            raise ValueError(
+                f"{ranking_path} is missing required columns: {', '.join(sorted(missing))}"
+            )
+
+        for row in reader:
+            pos_raw = (row.get("position") or "").strip()
+            owner_raw = row.get("originalOwner") or ""
+            owner = normalize_addr(owner_raw)
+
+            if not pos_raw or not owner:
+                continue
+
+            try:
+                pos = int(float(pos_raw))
+            except Exception:
+                continue
+
+            if pos <= 0:
+                continue
+
+            # Filter to eligible owners.
+            if owner not in eligible_wallets:
+                continue
+
+            # Keep row plus parsed position and normalized owner.
+            entry_rows.append(
+                {
+                    "position": str(pos),
+                    "gotchiID": (row.get("gotchiID") or "").strip(),
+                    "name": (row.get("name") or "").strip(),
+                    "withSetsRarityScore": (row.get("withSetsRarityScore") or "").strip(),
+                    "kinship": (row.get("kinship") or "").strip(),
+                    "experience": (row.get("experience") or "").strip(),
+                    "level": (row.get("level") or "").strip(),
+                    "originalOwner": owner,
+                }
+            )
+
+    owner_rewards: Dict[str, float] = {}
+    entry_details: List[Dict[str, str]] = []
+
+    if not entry_rows or pool_amount <= 0:
+        # No eligible entries or no pool; all rewards remain zero.
+        return owner_rewards, entry_details
+
+    # Compute original weights
+    for e in entry_rows:
+        pos = int(e["position"])
         w = (1.0 / float(pos)) ** exponent
-        if w > 0:
-            entries.append((owner, w))
+        e["originalWeight"] = w
 
-    if not entries or pool_amount <= 0:
-        return {}
-
-    total_w = sum(w for _, w in entries)
+    total_w = sum(float(e["originalWeight"]) for e in entry_rows)
     if total_w <= 0:
-        return {}
+        # Degenerate case: no positive weights.
+        return owner_rewards, entry_details
 
-    # Normalize and assign rewards
-    rewards: Dict[str, float] = {}
-    for owner, w in entries:
-        share = w / total_w
-        rewards[owner] = rewards.get(owner, 0.0) + share * pool_amount
+    # Normalize and compute per-entry rewards; aggregate per-owner.
+    for e in entry_rows:
+        w_orig = float(e["originalWeight"])
+        w_norm = w_orig / total_w
+        reward = w_norm * pool_amount
 
-    return rewards
+        e["weightAmongEligible"] = w_norm
+        e["reward"] = reward
+
+        owner = e["originalOwner"]
+        owner_rewards[owner] = owner_rewards.get(owner, 0.0) + reward
+
+        # Prepare a stringified copy for CSV output.
+        entry_details.append(
+            {
+                "position": e["position"],
+                "gotchiID": e["gotchiID"],
+                "name": e["name"],
+                "withSetsRarityScore": e["withSetsRarityScore"],
+                "kinship": e["kinship"],
+                "experience": e["experience"],
+                "level": e["level"],
+                "originalOwner": owner,
+                "originalWeight": f"{w_orig:.12f}",
+                "weightAmongEligible": f"{w_norm:.12f}",
+                "reward": f"{reward:.12f}",
+            }
+        )
+
+    return owner_rewards, entry_details
 
 
 def write_rewards_output(
@@ -284,16 +409,49 @@ def write_rewards_output(
             writer.writerow([w, f"{r:.10f}"])
 
 
+def write_leaderboard_rewards_details(
+    output_path: str,
+    entry_details: List[Dict[str, str]],
+) -> None:
+    """
+    Write per-entry leaderboard rewards CSV with schema:
+
+        position,gotchiID,name,withSetsRarityScore,kinship,experience,level,
+        originalOwner,originalWeight,weightAmongEligible,reward
+
+    Only entries with eligible owners (already filtered upstream) are included.
+    """
+    header = [
+        "position",
+        "gotchiID",
+        "name",
+        "withSetsRarityScore",
+        "kinship",
+        "experience",
+        "level",
+        "originalOwner",
+        "originalWeight",
+        "weightAmongEligible",
+        "reward",
+    ]
+
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=header)
+        writer.writeheader()
+        for e in entry_details:
+            writer.writerow(e)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
-    if len(sys.argv) != 8:
+    if len(sys.argv) != 11:
         print(
             "Usage:\n"
             "  python CalculateRFRewards.py "
-            "EligibleWalletsLatest.csv BRSRanking.csv KINRankings.csv XPRankings.csv RewardAmount RewardPercentages OutputRewards.csv\n\n"
+            "EligibleWalletsLatest.csv BRSRanking.csv KINRankings.csv XPRankings.csv RewardAmount RewardPercentages OutputRewards.csv BRSRewardDetails.csv KINRewardDetails.csv XPRewardDetails.csv\n\n"
             "RewardPercentages examples: \"50,30,20\" or \"0.5,0.3,0.2\"",
             file=sys.stderr,
         )
@@ -306,6 +464,11 @@ def main():
     reward_amount_raw = sys.argv[5]
     reward_percentages_raw = sys.argv[6]
     output_path = sys.argv[7]
+
+    # Fixed filenames for per-entry leaderboard rewards.
+    brs_rewards_csv_path = sys.argv[8]
+    kin_rewards_csv_path = sys.argv[9]
+    xp_rewards_csv_path = sys.argv[10]
 
     eligible_wallets = load_eligible_wallets(eligible_wallets_path)
     if not eligible_wallets:
@@ -325,20 +488,20 @@ def main():
     kin_pool = reward_amount * kin_frac
     xp_pool = reward_amount * xp_frac
 
-    # Compute per-owner rewards for each ranking
-    brs_rewards = compute_owner_rewards_from_ranking(
+    # Compute per-owner rewards and per-entry details for each ranking.
+    brs_rewards, brs_entries = compute_owner_rewards_from_ranking(
         ranking_path=brs_path,
         eligible_wallets=eligible_wallets,
         pool_amount=brs_pool,
         exponent=0.94,
     )
-    kin_rewards = compute_owner_rewards_from_ranking(
+    kin_rewards, kin_entries = compute_owner_rewards_from_ranking(
         ranking_path=kin_path,
         eligible_wallets=eligible_wallets,
         pool_amount=kin_pool,
         exponent=0.76,
     )
-    xp_rewards = compute_owner_rewards_from_ranking(
+    xp_rewards, xp_entries = compute_owner_rewards_from_ranking(
         ranking_path=xp_path,
         eligible_wallets=eligible_wallets,
         pool_amount=xp_pool,
@@ -351,8 +514,13 @@ def main():
         for owner, amt in d.items():
             total_rewards[owner] = total_rewards.get(owner, 0.0) + float(amt)
 
-    # Write output
+    # Write per-wallet output
     write_rewards_output(output_path, eligible_wallets, total_rewards)
+
+    # Write per-entry leaderboard CSVs
+    write_leaderboard_rewards_details(brs_rewards_csv_path, brs_entries)
+    write_leaderboard_rewards_details(kin_rewards_csv_path, kin_entries)
+    write_leaderboard_rewards_details(xp_rewards_csv_path, xp_entries)
 
     # Optional diagnostics to stderr
     total_out = sum(total_rewards.get(w, 0.0) for w in eligible_wallets)
@@ -360,7 +528,10 @@ def main():
     print(f"RewardAmount: {reward_amount}", file=sys.stderr)
     print(f"Pools -> BRS: {brs_pool}, KIN: {kin_pool}, XP: {xp_pool}", file=sys.stderr)
     print(f"Total rewards assigned (eligible wallets): {total_out}", file=sys.stderr)
-    print(f"Wrote: {output_path}", file=sys.stderr)
+    print(f"Wrote per-wallet rewards: {output_path}", file=sys.stderr)
+    print(f"Wrote BRS per-entry rewards: {brs_rewards_csv_path}", file=sys.stderr)
+    print(f"Wrote KIN per-entry rewards: {kin_rewards_csv_path}", file=sys.stderr)
+    print(f"Wrote XP per-entry rewards: {xp_rewards_csv_path}", file=sys.stderr)
 
 
 if __name__ == "__main__":
